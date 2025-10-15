@@ -1,37 +1,90 @@
-# react-native-shimmer-loader
 
-Shimmer loader view
+## 🪄 react-native-shimmer-loader
 
-## Installation
-
-
-```sh
-npm install react-native-shimmer-loader
-```
-
-
-## Usage
-
-
-```js
-import { multiply } from 'react-native-shimmer-loader';
-
-// ...
-
-const result = await multiply(3, 7);
-```
-
-
-## Contributing
-
-- [Development workflow](CONTRIBUTING.md#development-workflow)
-- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
-- [Code of conduct](CODE_OF_CONDUCT.md)
-
-## License
-
-MIT
+A lightweight React Native shimmer loader that automatically generates placeholder skeletons from your layout — no manual setup required.
+Supports **RTL**, **custom shimmer components**, and fully dynamic structures.
 
 ---
 
-Made with [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
+### 📸 Preview
+
+
+https://github.com/user-attachments/assets/3ad34ab7-1725-4657-b276-0ecb7d706eea
+
+
+
+*(This animation shows the shimmer effect in action.)*
+
+---
+
+### 🚀 Installation
+
+```bash
+npm install react-native-shimmer-loader
+# or
+yarn add react-native-shimmer-loader
+```
+
+---
+
+### 💡 Usage
+
+You can find a complete working example here:
+👉 [Example App](https://github.com/jagnesh/react-native-shimmer-loader/tree/main/example)
+
+Basic usage example:
+
+```tsx
+import React from 'react';
+import { View, Text } from 'react-native';
+import ShimmerLoader from 'react-native-shimmer-loader';
+
+const App = () => (
+  <ShimmerLoader isLoading={true}>
+    <View>
+      <Text>Loaded content</Text>
+    </View>
+  </ShimmerLoader>
+);
+```
+
+---
+
+### ⚙️ Props
+
+| Prop              | Type              | Default             | Description                                                                        |
+| ----------------- | ----------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| **isLoading**     | `boolean`         | `false`             | Controls whether shimmer is shown or actual children.                              |
+| **blinkDuration** | `number`          | `600`               | Duration (ms) of shimmer fade in/out animation.                                    |
+| **isRtl**         | `boolean`         | `I18nManager.isRTL` | Enables Right-to-Left shimmer animation direction.                                 |
+| **customLayout**  | `React.ReactNode` | `undefined`         | Optional custom component/layout to display instead of the auto-generated shimmer. |
+
+---
+
+### 🧱 Features
+
+✅ Auto-generates shimmer placeholders from your layout
+
+✅ Supports **Text**, **View**, and **nested components**
+
+✅ **Custom shimmer layouts** for total control
+
+✅ **RTL support** (auto-detected or manual)
+
+✅ Lightweight & dependency-free
+
+---
+
+### 🧑‍💻 Example Use Cases
+
+* Placeholder UI while fetching API data
+* Skeleton screens for lists, cards, or complex views
+* Reusable shimmer templates with custom layouts
+
+---
+
+### 🧩 License
+
+MIT © [Jagnesh Chawla](https://github.com/jagnesh)
+
+
