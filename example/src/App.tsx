@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ShimmerLoader } from 'react-native-shimmer-loader';
+import ShimmerLoader from 'react-native-shimmer-loader';
 const Item = ({
   itemKey,
   isLoading,

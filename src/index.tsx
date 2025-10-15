@@ -1,2 +1,3 @@
 import LoadingWrapper from './ShimmerLoader';
-export { LoadingWrapper as ShimmerLoader };
+const ShimmerLoader = LoadingWrapper;
+export default ShimmerLoader;
