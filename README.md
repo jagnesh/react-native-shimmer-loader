@@ -9,7 +9,9 @@ Supports **RTL**, **custom shimmer components**, and fully dynamic structures.
 ### 📸 Preview
 
 
-https://github.com/user-attachments/assets/3ad34ab7-1725-4657-b276-0ecb7d706eea
+
+
+https://github.com/user-attachments/assets/c73ce871-de91-4b86-81ab-f4a847a6f113
 
 
 
