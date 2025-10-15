@@ -1,5 +1,7 @@
 
 ## 🪄 react-native-shimmer-loader
+[![npm version](https://img.shields.io/npm/v/react-native-shimmer-loader)](https://www.npmjs.com/package/react-native-shimmer-loader)
+[![License](https://img.shields.io/github/license/jagnesh/react-native-shimmer-loader)](https://github.com/jagnesh/react-native-shimmer-loader#readme)
 
 A lightweight React Native shimmer loader that automatically generates placeholder skeletons from your layout — no manual setup required.
 Supports **RTL**, **custom shimmer components**, and fully dynamic structures.
