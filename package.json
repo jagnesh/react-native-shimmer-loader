@@ -1,7 +1,7 @@
 {
   "name": "react-native-shimmer-loader",
   "version": "0.1.0",
-  "description": "Shimmer loader view",
+  "description": "A lightweight React Native shimmer loader that automatically generates placeholder skeletons from your layout — no manual setup required. Supports RTL, custom shimmer components, and fully dynamic structures.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
