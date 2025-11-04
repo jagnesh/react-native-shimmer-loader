@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button, ScrollView, StyleSheet } from 'react-native';
 import ShimmerLoader from 'react-native-shimmer-loader';
+import UiText from './UiText';
+import UiView from './UiView';
 const Item = ({
   itemKey,
   isLoading,
@@ -8,14 +10,16 @@ const Item = ({
   itemKey: string;
   isLoading: boolean;
 }) => (
-  <View key={itemKey}>
-    <View>
-      <Text style={styles.text}>{!isLoading ? 'Placeholder Text' : ''}</Text>
-    </View>
-    <View>{<Text style={styles.text}>Another Text</Text>}</View>
-    <View style={styles.box} />
-    <View style={styles.smallBox} />
-    <View
+  <UiView key={itemKey}>
+    <UiView>
+      <UiText style={styles.text}>
+        {!isLoading ? 'Placeholder Text' : ''}
+      </UiText>
+    </UiView>
+    <UiView>{<UiText style={styles.text}>Another Text</UiText>}</UiView>
+    <UiView style={styles.box} />
+    <UiView style={styles.smallBox} />
+    <UiView
       style={{
         flexDirection: 'row',
         gap: 20,
@@ -23,7 +27,7 @@ const Item = ({
         alignItems: 'center',
       }}
     >
-      <View
+      <UiView
         style={{
           width: 50,
           height: 50,
@@ -31,10 +35,10 @@ const Item = ({
           backgroundColor: 'red',
         }}
       />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.rowText}>Row Text</Text>
-      </View>
-      <View
+      <UiView style={{ flex: 1 }}>
+        <UiText style={styles.rowText}>Row Text</UiText>
+      </UiView>
+      <UiView
         style={{
           width: 50,
           height: 50,
@@ -42,17 +46,17 @@ const Item = ({
           backgroundColor: 'red',
         }}
       />
-    </View>
-  </View>
+    </UiView>
+  </UiView>
 );
 
 const MyCustomShimmer = () => (
-  <View style={{ padding: 10, backgroundColor: '#ddd' }}>
-    <View>
-      <Text>✨ Custom Shimmer Loading...</Text>
-    </View>
-    <View style={styles.smallBox} />
-  </View>
+  <UiView style={{ padding: 10, backgroundColor: '#ddd' }}>
+    <UiView>
+      <UiText>✨ Custom Shimmer Loading...</UiText>
+    </UiView>
+    <UiView style={styles.smallBox} />
+  </UiView>
 );
 
 // Demo Component
@@ -71,15 +75,15 @@ const App = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>
+    <UiView style={styles.container}>
+      <UiText style={styles.header}>
         Status: {isLoading ? 'Loading...' : 'Loaded'}
-      </Text>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      </UiText>
+      <UiView style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Default" onPress={() => setViewType('default')} />
         <Button title="Rtl" onPress={() => setViewType('rtl')} />
         <Button title="Custom Layout" onPress={() => setViewType('custom')} />
-      </View>
+      </UiView>
       <ScrollView>
         {/* With RTL */}
         <ShimmerLoader
@@ -88,16 +92,16 @@ const App = () => {
           isRtl={viewType === 'rtl'}
           customLayout={viewType === 'custom' ? <MyCustomShimmer /> : undefined}
         >
-          <View
+          <UiView
             style={{ gap: 2, direction: viewType === 'rtl' ? 'rtl' : 'ltr' }}
           >
             {Array.from({ length: 10 }).map((_, itemIndex) => (
               <Item isLoading={isLoading} key={itemIndex} itemKey="dd" />
             ))}
-          </View>
+          </UiView>
         </ShimmerLoader>
       </ScrollView>
-    </View>
+    </UiView>
   );
 };
 
