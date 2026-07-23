@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Button, ScrollView, StyleSheet } from 'react-native';
 import ShimmerLoader from 'react-native-shimmer-loader';
+import TestComponent from './TestComponent';
 import UiText from './UiText';
 import UiView from './UiView';
+
 const Item = ({
   itemKey,
   isLoading,
@@ -85,18 +87,31 @@ const App = () => {
         <Button title="Custom Layout" onPress={() => setViewType('custom')} />
       </UiView>
       <ScrollView>
-        {/* With RTL */}
+        {/* TestComponent Demo */}
+        <ShimmerLoader
+          isLoading={isLoading}
+          blinkDuration={800}
+          isRtl={viewType === 'rtl'}
+          customLayout={viewType === 'custom' ? <MyCustomShimmer /> : undefined}
+        >
+          <TestComponent isLoading={isLoading} />
+        </ShimmerLoader>
+
+        {/* Existing Item List Demo */}
         <ShimmerLoader
           isLoading={isLoading}
           blinkDuration={500}
           isRtl={viewType === 'rtl'}
-          customLayout={viewType === 'custom' ? <MyCustomShimmer /> : undefined}
         >
           <UiView
             style={{ gap: 2, direction: viewType === 'rtl' ? 'rtl' : 'ltr' }}
           >
-            {Array.from({ length: 10 }).map((_, itemIndex) => (
-              <Item isLoading={isLoading} key={itemIndex} itemKey="dd" />
+            {Array.from({ length: 3 }).map((_, itemIndex) => (
+              <Item
+                isLoading={isLoading}
+                key={itemIndex}
+                itemKey={`item-${itemIndex}`}
+              />
             ))}
           </UiView>
         </ShimmerLoader>

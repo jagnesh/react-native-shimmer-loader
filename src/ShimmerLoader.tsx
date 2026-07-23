@@ -1,17 +1,451 @@
 import React, { useEffect, useRef } from 'react';
 import type { ViewStyle } from 'react-native';
-import { Animated, I18nManager, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  I18nManager,
+  Image,
+  ImageBackground,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
 const DEFAULT_COLOR = '#E0E0E0';
-interface LoadingWrapperProps {
+
+const LAYOUT_STYLE_KEYS: (keyof ViewStyle)[] = [
+  'width',
+  'height',
+  'minWidth',
+  'maxWidth',
+  'minHeight',
+  'maxHeight',
+  'aspectRatio',
+  'flex',
+  'flexDirection',
+  'flexWrap',
+  'flexGrow',
+  'flexShrink',
+  'flexBasis',
+  'justifyContent',
+  'alignItems',
+  'alignSelf',
+  'alignContent',
+  'gap',
+  'rowGap',
+  'columnGap',
+  'margin',
+  'marginTop',
+  'marginBottom',
+  'marginLeft',
+  'marginRight',
+  'marginHorizontal',
+  'marginVertical',
+  'padding',
+  'paddingTop',
+  'paddingBottom',
+  'paddingLeft',
+  'paddingRight',
+  'paddingHorizontal',
+  'paddingVertical',
+  'position',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'borderRadius',
+  'borderTopLeftRadius',
+  'borderTopRightRadius',
+  'borderBottomLeftRadius',
+  'borderBottomRightRadius',
+  'overflow',
+  'zIndex',
+  'direction',
+];
+
+const extractLayoutStyles = (style?: ViewStyle): ViewStyle => {
+  if (!style) return {};
+  const flatStyle = StyleSheet.flatten(style) || {};
+  const extracted: any = {};
+  for (const key of LAYOUT_STYLE_KEYS) {
+    if (flatStyle[key] !== undefined) {
+      extracted[key] = flatStyle[key];
+    }
+  }
+  return extracted;
+};
+
+const isTextLike = (type: any, componentMap?: Record<string, any>): boolean => {
+  if (!type) return false;
+  if (
+    type === Text ||
+    type === Animated.Text ||
+    type === 'Text' ||
+    type === 'RCTText'
+  )
+    return true;
+  const name = type?.displayName || type?.name;
+  if (name === 'Text') return true;
+  if (
+    componentMap &&
+    name &&
+    (componentMap[name] === Text || componentMap[name] === 'Text')
+  )
+    return true;
+  return false;
+};
+
+const isImageLike = (
+  type: any,
+  componentMap?: Record<string, any>
+): boolean => {
+  if (!type) return false;
+  if (
+    type === Image ||
+    type === ImageBackground ||
+    type === Animated.Image ||
+    type === 'Image' ||
+    type === 'RCTImageView'
+  )
+    return true;
+  const name = type?.displayName || type?.name;
+  if (name === 'Image' || name === 'ImageBackground') return true;
+  if (
+    componentMap &&
+    name &&
+    (componentMap[name] === Image || componentMap[name] === 'Image')
+  )
+    return true;
+  return false;
+};
+
+const isViewLike = (type: any, componentMap?: Record<string, any>): boolean => {
+  if (!type) return false;
+  if (
+    type === View ||
+    type === Animated.View ||
+    type === 'View' ||
+    type === 'RCTView' ||
+    type?.displayName === 'View'
+  )
+    return true;
+
+  const name = type?.displayName || type?.name;
+  if (
+    name === 'Pressable' ||
+    name === 'TouchableOpacity' ||
+    name === 'TouchableHighlight' ||
+    name === 'TouchableWithoutFeedback' ||
+    name === 'ScrollView' ||
+    name === 'SafeAreaView'
+  )
+    return true;
+
+  if (
+    componentMap &&
+    name &&
+    (componentMap[name] === View || componentMap[name] === 'View')
+  )
+    return true;
+  return false;
+};
+
+const unwrapElement = (
+  element: any,
+  componentMap?: Record<string, any>,
+  depth = 0
+): any => {
+  if (!element || typeof element !== 'object' || depth > 10) {
+    return element;
+  }
+
+  let type = element.type;
+  const props = element.props || {};
+
+  if (!type) return element;
+
+  // Check componentMap override
+  const componentName = type?.displayName || type?.name;
+  if (componentMap && componentName && componentMap[componentName]) {
+    const mapped = componentMap[componentName];
+    if (
+      mapped === View ||
+      mapped === 'View' ||
+      mapped === Text ||
+      mapped === 'Text' ||
+      mapped === Image ||
+      mapped === 'Image'
+    ) {
+      return { ...element, type: mapped };
+    }
+    type = mapped;
+  }
+
+  // Handle React.Fragment
+  if (type === React.Fragment || type === Symbol.for('react.fragment')) {
+    return element;
+  }
+
+  // Handle React.memo
+  if (
+    typeof type === 'object' &&
+    (type.$$typeof === Symbol.for('react.memo') ||
+      type.$$typeof === Symbol.for('react.memo_type'))
+  ) {
+    const innerType = type.type;
+    return unwrapElement(
+      { ...element, type: innerType },
+      componentMap,
+      depth + 1
+    );
+  }
+
+  // Handle React.forwardRef
+  if (
+    typeof type === 'object' &&
+    (type.$$typeof === Symbol.for('react.forward_ref') ||
+      typeof type.render === 'function')
+  ) {
+    try {
+      const renderFn = type.render;
+      const rendered = renderFn(props, null);
+      if (rendered && typeof rendered === 'object' && rendered.type) {
+        return unwrapElement(rendered, componentMap, depth + 1);
+      }
+    } catch (e) {
+      // Ignore error and fall through
+    }
+  }
+
+  // Handle functional and class components
+  if (
+    typeof type === 'function' &&
+    type !== View &&
+    type !== Text &&
+    type !== Image &&
+    type?.displayName !== 'View' &&
+    type?.displayName !== 'Text' &&
+    type?.displayName !== 'Image'
+  ) {
+    if (type.prototype && type.prototype.isReactComponent) {
+      try {
+        const instance = new (type as any)(props);
+        const rendered = instance.render();
+        if (rendered && typeof rendered === 'object' && rendered.type) {
+          return unwrapElement(rendered, componentMap, depth + 1);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    } else {
+      try {
+        const rendered = type(props);
+        if (rendered && typeof rendered === 'object' && rendered.type) {
+          return unwrapElement(rendered, componentMap, depth + 1);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    }
+  }
+
+  return element;
+};
+
+export interface CloneOptions {
+  blinkDuration?: number;
+  isRtl?: boolean;
+  opacity?: Animated.AnimatedInterpolation<number> | Animated.Value | number;
+  color?: string;
+  shimmerColor?: string;
+  backgroundColor?: string;
+  shimmerComponent?: React.ComponentType<{
+    style?: ViewStyle;
+    opacity?: any;
+  }>;
+  componentMap?: {
+    [key: string]: React.ComponentType<any>;
+  };
+}
+
+export const cloneLayoutTree = (
+  element: any,
+  options: CloneOptions = {},
+  index?: number,
+  depth = 0
+): any => {
+  if (!element || depth > 20) return null;
+
+  const { opacity, shimmerComponent, componentMap } = options;
+  const activeColor =
+    options.color ??
+    options.shimmerColor ??
+    options.backgroundColor ??
+    DEFAULT_COLOR;
+
+  if (Array.isArray(element)) {
+    const clonedArray = element
+      .map((child, idx) => cloneLayoutTree(child, options, idx, depth + 1))
+      .filter(Boolean);
+    return clonedArray.length > 0 ? clonedArray : null;
+  }
+
+  if (typeof element !== 'object' || !element.type) {
+    return null;
+  }
+
+  const unwrapped = unwrapElement(element, componentMap);
+  if (!unwrapped || typeof unwrapped !== 'object' || !unwrapped.type) {
+    if (element.props?.children) {
+      return cloneLayoutTree(element.props.children, options, index, depth + 1);
+    }
+    const flatStyle = StyleSheet.flatten(element.props?.style);
+    if (flatStyle && (flatStyle.width || flatStyle.height || flatStyle.flex)) {
+      const layoutStyle = extractLayoutStyles(flatStyle);
+      const shimmerStyle = {
+        ...layoutStyle,
+        backgroundColor: activeColor,
+        borderRadius: layoutStyle.borderRadius || 4,
+      };
+      const key =
+        element.key ||
+        `shimmer-${index}-${Math.random().toString(36).substring(2, 9)}`;
+      return shimmerComponent ? (
+        React.createElement(shimmerComponent, {
+          key,
+          style: shimmerStyle,
+          opacity,
+        })
+      ) : (
+        <Animated.View
+          key={key}
+          style={[shimmerStyle, opacity ? { opacity } : undefined]}
+        />
+      );
+    }
+    return null;
+  }
+
+  const { type, props } = unwrapped;
+  const key =
+    element.key ||
+    unwrapped.key ||
+    `shimmer-${index}-${Math.random().toString(36).substring(2, 9)}`;
+
+  if (type === React.Fragment || type === Symbol.for('react.fragment')) {
+    if (props.children) {
+      return cloneLayoutTree(props.children, options, index, depth + 1);
+    }
+    return null;
+  }
+
+  if (isTextLike(type, componentMap)) {
+    const textStyle = StyleSheet.flatten(props.style || {});
+    const layoutStyle = extractLayoutStyles(textStyle);
+    const fontSize = textStyle.fontSize;
+    const calculatedHeight =
+      textStyle.height || (fontSize ? Math.round(fontSize * 1.25) : 20);
+
+    const shimmerStyle: ViewStyle = {
+      ...layoutStyle,
+      height: calculatedHeight,
+      width: textStyle.width || '90%',
+      backgroundColor: activeColor,
+      borderRadius: textStyle.borderRadius || 4,
+    };
+
+    if (shimmerComponent) {
+      const ShimmerComp = shimmerComponent;
+      return <ShimmerComp key={key} style={shimmerStyle} opacity={opacity} />;
+    }
+    return (
+      <Animated.View
+        key={key}
+        style={[shimmerStyle, opacity ? { opacity } : undefined]}
+      />
+    );
+  }
+
+  if (isImageLike(type, componentMap)) {
+    const imageStyle = StyleSheet.flatten(props.style || {});
+    const layoutStyle = extractLayoutStyles(imageStyle);
+
+    const shimmerStyle: ViewStyle = {
+      ...layoutStyle,
+      backgroundColor: activeColor,
+      borderRadius: layoutStyle.borderRadius || 4,
+    };
+
+    if (shimmerComponent) {
+      const ShimmerComp = shimmerComponent;
+      return <ShimmerComp key={key} style={shimmerStyle} opacity={opacity} />;
+    }
+    return (
+      <Animated.View
+        key={key}
+        style={[shimmerStyle, opacity ? { opacity } : undefined]}
+      />
+    );
+  }
+
+  let clonedChildren: any = null;
+  if (props.children) {
+    const childrenArray = React.Children.toArray(props.children);
+    const cloned = childrenArray
+      .map((child, idx) => cloneLayoutTree(child, options, idx, depth + 1))
+      .filter(Boolean);
+
+    const flattened = cloned.flat(Infinity).filter(Boolean);
+    if (flattened.length > 0) {
+      clonedChildren = flattened;
+    }
+  }
+
+  const viewStyle = StyleSheet.flatten(props.style || {});
+  const layoutStyle = extractLayoutStyles(viewStyle);
+  const hasChildren = Boolean(clonedChildren && clonedChildren.length > 0);
+
+  if (!hasChildren || !isViewLike(type, componentMap)) {
+    const shimmerStyle: ViewStyle = {
+      ...layoutStyle,
+      backgroundColor: activeColor,
+      borderRadius: layoutStyle.borderRadius || 4,
+    };
+
+    if (shimmerComponent) {
+      const ShimmerComp = shimmerComponent;
+      return <ShimmerComp key={key} style={shimmerStyle} opacity={opacity} />;
+    }
+    return (
+      <Animated.View
+        key={key}
+        style={[shimmerStyle, opacity ? { opacity } : undefined]}
+      />
+    );
+  }
+
+  const containerStyle: ViewStyle = {
+    ...layoutStyle,
+  };
+
+  return (
+    <View key={key} style={containerStyle}>
+      {clonedChildren}
+    </View>
+  );
+};
+
+export interface LoadingWrapperProps {
   isLoading?: boolean;
   children: React.ReactNode;
   blinkDuration?: number;
   isRtl?: boolean;
+  color?: string;
+  shimmerColor?: string;
+  backgroundColor?: string;
   shimmerComponent?: React.ComponentType<{
     style?: ViewStyle;
-    opacity: Animated.AnimatedInterpolation<number>;
+    opacity?: any;
   }>;
-  backgroundColor?: string;
   componentMap?: {
     [key: string]: React.ComponentType<any>;
   };
@@ -23,8 +457,10 @@ const LoadingWrapper: React.FC<LoadingWrapperProps> = ({
   children,
   blinkDuration = 1000,
   isRtl = I18nManager.isRTL,
-  shimmerComponent,
+  color,
+  shimmerColor,
   backgroundColor,
+  shimmerComponent,
   componentMap,
   customLayout,
 }) => {
@@ -32,12 +468,14 @@ const LoadingWrapper: React.FC<LoadingWrapperProps> = ({
     return <>{children}</>;
   }
 
+  const activeColor = color ?? shimmerColor ?? backgroundColor;
+
   return (
     <ShimmerClone
       blinkDuration={blinkDuration}
       isRtl={isRtl}
       shimmerComponent={shimmerComponent}
-      backgroundColor={backgroundColor}
+      color={activeColor}
       componentMap={componentMap}
     >
       {customLayout ?? children}
@@ -45,15 +483,17 @@ const LoadingWrapper: React.FC<LoadingWrapperProps> = ({
   );
 };
 
-const ShimmerClone: React.FC<{
+export const ShimmerClone: React.FC<{
   children: React.ReactNode;
   blinkDuration: number;
   isRtl?: boolean;
+  color?: string;
+  shimmerColor?: string;
+  backgroundColor?: string;
   shimmerComponent?: React.ComponentType<{
     style?: ViewStyle;
-    opacity: Animated.AnimatedInterpolation<number>;
+    opacity?: any;
   }>;
-  backgroundColor?: string;
   componentMap?: {
     [key: string]: React.ComponentType<any>;
   };
@@ -61,8 +501,10 @@ const ShimmerClone: React.FC<{
   children,
   blinkDuration,
   isRtl,
-  shimmerComponent,
+  color,
+  shimmerColor,
   backgroundColor,
+  shimmerComponent,
   componentMap,
 }) => {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
@@ -91,218 +533,16 @@ const ShimmerClone: React.FC<{
     outputRange: [0.3, 0.7],
   });
 
-  const cloneElement = (element: any, index?: number): any => {
-    if (!element) return null;
-
-    // Handle arrays of elements
-    if (Array.isArray(element)) {
-      return element.map((child, idx) => cloneElement(child, idx));
-    }
-
-    // Handle non-React elements (strings, numbers, etc.)
-    if (typeof element !== 'object' || !element.type) {
-      return null;
-    }
-
-    const { type, props } = element;
-    // Use element.key instead of props.key (React doesn't expose key in props)
-    const key =
-      element.key ||
-      `shimmer-${index}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Check if this is a mapped custom component
-    const componentName = type?.displayName || type?.name;
-    const mappedComponentType =
-      componentName && componentMap ? componentMap[componentName] : null;
-
-    // Handle mapped custom components (like UiView, UiText)
-    if (mappedComponentType) {
-      // Create a new element with the mapped component type
-      const mappedElement = {
-        ...element,
-        type: mappedComponentType,
-      };
-
-      // Process the mapped element as if it was the native component
-      return cloneElement(mappedElement, index);
-    }
-
-    // Handle functional components - render them first to get their JSX
-    // This will automatically handle custom components like UiView, UiText, etc.
-    if (typeof type === 'function' && type !== View && type !== Text) {
-      try {
-        // For functional components, call them to get their rendered output
-        let rendered;
-
-        // Check if it's a forwardRef component
-        if (type.$typeof === Symbol.for('react.forward_ref')) {
-          // ForwardRef components need special handling
-          const wrappedComponent = (type as any).render;
-          rendered = wrappedComponent(props, null);
-        } else if (type.length === 0 || type.length === 1) {
-          // Most functional components take 0 or 1 argument (props)
-          rendered = type(props);
-        } else {
-          // Might be a different kind of function, skip it
-          return null;
-        }
-
-        // If the component returns null or falsy, skip it
-        if (!rendered) return null;
-
-        // Recursively clone the rendered output
-        return cloneElement(rendered, index);
-      } catch (e) {
-        console.warn('Error rendering component in shimmer:', e);
-        // If rendering fails, try to extract children
-        if (props.children) {
-          return React.Children.map(props.children, (child, idx) =>
-            cloneElement(child, idx)
-          );
-        }
-        return null;
-      }
-    }
-
-    // Handle class components
-    if (type.prototype && type.prototype.isReactComponent) {
-      try {
-        const instance = new type(props);
-        const rendered = instance.render();
-        if (!rendered) return null;
-        return cloneElement(rendered, index);
-      } catch (e) {
-        console.warn('Error rendering class component in shimmer:', e);
-        if (props.children) {
-          return React.Children.map(props.children, (child, idx) =>
-            cloneElement(child, idx)
-          );
-        }
-        return null;
-      }
-    }
-
-    // Handle Text components - always create shimmer bar
-    if (type === Text || type?.displayName === 'Text') {
-      const textStyle = StyleSheet.flatten(props.style || {});
-
-      const shimmerStyle: ViewStyle = {
-        height: textStyle.height || 20,
-        width: textStyle.width || '90%',
-        backgroundColor: backgroundColor || DEFAULT_COLOR,
-        borderRadius: 4,
-        marginBottom: textStyle.marginBottom,
-        marginTop: textStyle.marginTop,
-        marginLeft: textStyle.marginLeft,
-        marginRight: textStyle.marginRight,
-      };
-
-      // Use custom shimmer component if provided
-      if (shimmerComponent) {
-        const ShimmerComp = shimmerComponent;
-        return <ShimmerComp key={key} style={shimmerStyle} opacity={opacity} />;
-      }
-
-      return <Animated.View key={key} style={[shimmerStyle, { opacity }]} />;
-    }
-
-    // Handle View components
-    if (type === View || type?.displayName === 'View') {
-      const viewStyle = StyleSheet.flatten(props.style || {});
-
-      // Clone children recursively first
-      let clonedChildren = null;
-      if (props.children) {
-        clonedChildren = React.Children.map(props.children, (child, idx) =>
-          cloneElement(child, idx)
-        );
-      }
-
-      // Check if View has any dimension-related styles
-      const hasDimensions =
-        viewStyle.width || viewStyle.height || viewStyle.flex;
-
-      // Extract relevant style properties
-      const shimmerStyle: ViewStyle = {
-        width: viewStyle.width,
-        height: viewStyle.height,
-        borderRadius: viewStyle.borderRadius,
-        marginTop: viewStyle.marginTop,
-        marginBottom: viewStyle.marginBottom,
-        marginLeft: viewStyle.marginLeft,
-        marginRight: viewStyle.marginRight,
-        padding: viewStyle.padding,
-        paddingTop: viewStyle.paddingTop,
-        paddingBottom: viewStyle.paddingBottom,
-        paddingLeft: viewStyle.paddingLeft,
-        paddingRight: viewStyle.paddingRight,
-        flexDirection: viewStyle.flexDirection,
-        gap: viewStyle.gap,
-        alignItems: viewStyle.alignItems,
-        justifyContent: viewStyle.justifyContent,
-        flex: viewStyle.flex,
-        // If View has children but no dimensions, give it full width
-        // so children can be visible
-        ...(clonedChildren && !hasDimensions && { alignSelf: 'stretch' }),
-      };
-
-      // If View has background color and dimensions, make it a shimmer block
-      const hasBackgroundAndSize =
-        viewStyle.backgroundColor && (viewStyle.height || viewStyle.width);
-
-      if (hasBackgroundAndSize) {
-        // Check if this View has any Text children that should be rendered
-        const hasTextChildren =
-          clonedChildren && React.Children.count(clonedChildren) > 0;
-
-        if (!hasTextChildren) {
-          // Solid shimmer block (no children to render)
-          const solidShimmerStyle = {
-            ...shimmerStyle,
-            backgroundColor: backgroundColor || DEFAULT_COLOR,
-          };
-
-          // Use custom shimmer component if provided
-          if (shimmerComponent) {
-            const ShimmerComp = shimmerComponent;
-            return (
-              <ShimmerComp
-                key={key}
-                style={solidShimmerStyle}
-                opacity={opacity}
-              />
-            );
-          }
-
-          return (
-            <Animated.View key={key} style={[solidShimmerStyle, { opacity }]} />
-          );
-        }
-        // Has children - don't make background shimmer, just preserve structure
-      }
-
-      // Return View with children
-      return (
-        <View key={key} style={shimmerStyle}>
-          {clonedChildren}
-        </View>
-      );
-    }
-
-    // Handle other components - try to extract children
-    if (props.children) {
-      const children = React.Children.map(props.children, (child, idx) =>
-        cloneElement(child, idx)
-      );
-      return <React.Fragment key={key}>{children}</React.Fragment>;
-    }
-
-    return null;
-  };
+  const activeColor = color ?? shimmerColor ?? backgroundColor;
 
   return (
     <View style={{ direction: isRtl ? 'rtl' : 'ltr' }}>
-      {cloneElement(children)}
+      {cloneLayoutTree(children, {
+        opacity,
+        shimmerComponent,
+        color: activeColor,
+        componentMap,
+      })}
     </View>
   );
 };
