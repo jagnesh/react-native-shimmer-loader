@@ -48,8 +48,45 @@ const App = () => (
     <View>
       <Text>Loaded content</Text>
     </View>
+</ShimmerLoader>
+);
+```
+
+---
+
+### 🧩 Complex Layouts
+
+`react-native-shimmer-loader` recursively clones your entire view hierarchy, making it trivial to support complex layouts like social cards, lists, or detailed profiles without manually building skeleton screens:
+
+```tsx
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import ShimmerLoader from 'react-native-shimmer-loader';
+
+const ComplexCard = ({ isLoading }: { isLoading: boolean }) => (
+  <ShimmerLoader isLoading={isLoading}>
+    <View style={styles.card}>
+      <View style={styles.headerRow}>
+        <View style={styles.avatar} />
+        <View style={styles.headerText}>
+          <Text style={styles.title}>{!isLoading ? 'Alex Morgan' : ''}</Text>
+          <Text style={styles.subtitle}>{!isLoading ? '2 hours ago' : ''}</Text>
+        </View>
+      </View>
+      <View style={styles.imagePlaceholder} />
+    </View>
   </ShimmerLoader>
 );
+
+const styles = StyleSheet.create({
+  card: { padding: 16, gap: 16, backgroundColor: '#fff', borderRadius: 16 },
+  headerRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#3b82f6' },
+  headerText: { gap: 4 },
+  title: { fontSize: 16, fontWeight: 'bold' },
+  subtitle: { fontSize: 12, color: '#64748b' },
+  imagePlaceholder: { height: 140, borderRadius: 12, backgroundColor: '#cbd5e1' }
+});
 ```
 
 ---
