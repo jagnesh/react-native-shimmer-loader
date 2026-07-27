@@ -12,6 +12,104 @@ import {
 
 const DEFAULT_COLOR = '#E0E0E0';
 
+const ReactInternals =
+  (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED ||
+  (React as any).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED_;
+
+const dummyDispatcher = {
+  readContext: (context: any) =>
+    context?._currentValue || context?._currentValue2 || {},
+  useContext: (context: any) =>
+    context?._currentValue || context?._currentValue2 || {},
+  useState: (initial: any) => [
+    typeof initial === 'function' ? initial() : initial,
+    () => {},
+  ],
+  useReducer: (_reducer: any, initial: any, init: any) => [
+    init !== undefined ? init(initial) : initial,
+    () => {},
+  ],
+  useRef: (initial: any) => ({ current: initial }),
+  useLayoutEffect: () => {},
+  useEffect: () => {},
+  useImperativeHandle: () => {},
+  useCallback: (fn: any) => fn,
+  useMemo: (fn: any) => {
+    try {
+      return fn();
+    } catch (e) {
+      return {};
+    }
+  },
+  useDebugValue: () => {},
+  useDeferredValue: (value: any) => value,
+  useTransition: () => [false, () => {}],
+  useId: () => 'shimmer-id',
+  useSyncExternalStore: (_subscribe: any, getSnapshot: any) => {
+    try {
+      return getSnapshot ? getSnapshot() : {};
+    } catch (e) {
+      return {};
+    }
+  },
+  useActionState: (_action: any, initial: any) => [initial, () => {}, false],
+  useFormStatus: () => ({
+    pending: false,
+    data: null,
+    method: null,
+    action: null,
+  }),
+  useOptimistic: (passthrough: any) => [passthrough, () => {}],
+};
+
+const safeRenderComponent = (type: any, props: any): any => {
+  if (typeof type !== 'function') return null;
+
+  // Native primitive built-ins
+  if (
+    type === View ||
+    type === Text ||
+    type === Image ||
+    type === Animated.View ||
+    type === Animated.Text ||
+    type === Animated.Image ||
+    type === ImageBackground
+  ) {
+    return null;
+  }
+
+  // React Class component
+  if (type.prototype && type.prototype.isReactComponent) {
+    try {
+      const instance = new (type as any)(props);
+      return instance.render();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Functional component with hook isolation
+  const dispatcherContainer = ReactInternals?.ReactCurrentDispatcher;
+  const originalDispatcher = dispatcherContainer?.current;
+  const originalError = console.error;
+
+  try {
+    console.error = () => {};
+    if (dispatcherContainer) {
+      dispatcherContainer.current = dummyDispatcher;
+    }
+    const result = type(props);
+    return result;
+  } catch (e) {
+    return null;
+  } finally {
+    console.error = originalError;
+    if (dispatcherContainer) {
+      dispatcherContainer.current = originalDispatcher;
+    }
+  }
+};
+
 const LAYOUT_STYLE_KEYS: (keyof ViewStyle)[] = [
   'width',
   'height',
@@ -264,6 +362,8 @@ const unwrapElement = (
   }
 
   let type = element.type;
+  const props = element.props || {};
+
   if (!type) return element;
 
   // Check componentMap override
@@ -309,12 +409,20 @@ const unwrapElement = (
       typeof type.render === 'function')
   ) {
     const renderFn = type.render;
-    if (renderFn && typeof renderFn === 'function') {
-      return unwrapElement(
-        { ...element, type: renderFn },
-        componentMap,
-        depth + 1
-      );
+    if (renderFn) {
+      const rendered = safeRenderComponent(renderFn, props);
+      if (rendered && typeof rendered === 'object' && rendered.type) {
+        return unwrapElement(rendered, componentMap, depth + 1);
+      }
+    }
+    return element;
+  }
+
+  // Handle Functional and Class components
+  if (typeof type === 'function') {
+    const rendered = safeRenderComponent(type, props);
+    if (rendered && typeof rendered === 'object' && rendered.type) {
+      return unwrapElement(rendered, componentMap, depth + 1);
     }
   }
 
@@ -499,20 +607,63 @@ export const cloneLayoutTree = (
 };
 
 export interface LoadingWrapperProps {
+  /**
+   * Whether the shimmer loading skeleton should be displayed.
+   * @default false
+   */
   isLoading?: boolean;
+
+  /**
+   * The child layout tree to render normally or extract skeleton layout from.
+   */
   children: React.ReactNode;
+
+  /**
+   * Blink animation cycle duration in milliseconds.
+   * @default 1000
+   */
   blinkDuration?: number;
+
+  /**
+   * Enable Right-to-Left (RTL) layout direction.
+   * @default I18nManager.isRTL
+   */
   isRtl?: boolean;
+
+  /**
+   * Shimmer background color for skeleton blocks.
+   * @default '#E0E0E0'
+   */
   color?: string;
+
+  /**
+   * Shimmer color (alias for `color`).
+   */
   shimmerColor?: string;
+
+  /**
+   * Background color (alias for `color`).
+   */
   backgroundColor?: string;
+
+  /**
+   * Custom shimmer component to render instead of default Animated.View.
+   */
   shimmerComponent?: React.ComponentType<{
     style?: ViewStyle;
     opacity?: any;
   }>;
+
+  /**
+   * Map custom component names to React Native primitives (View, Text, Image).
+   */
   componentMap?: {
     [key: string]: React.ComponentType<any>;
   };
+
+  /**
+   * Custom layout tree to render as shimmer placeholder when `isLoading` is true.
+   */
   customLayout?: React.ReactNode;
 }
 
