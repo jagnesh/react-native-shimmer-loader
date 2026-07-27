@@ -74,6 +74,94 @@ const extractLayoutStyles = (style?: ViewStyle): ViewStyle => {
   return extracted;
 };
 
+const getFallbackShimmerStyle = (
+  type: any,
+  extractedStyle: ViewStyle
+): ViewStyle => {
+  const style = { ...extractedStyle };
+  const borderRadius =
+    style.borderRadius !== undefined ? style.borderRadius : 4;
+  const hasDimensions =
+    style.height !== undefined ||
+    style.flex !== undefined ||
+    style.aspectRatio !== undefined;
+
+  if (hasDimensions) {
+    return {
+      ...style,
+      borderRadius,
+      width: style.width !== undefined ? style.width : '100%',
+    };
+  }
+
+  const name =
+    typeof type === 'string'
+      ? type
+      : type?.displayName || type?.name || type?._name || '';
+
+  const nameLower = name.toLowerCase();
+
+  if (
+    nameLower.includes('card') ||
+    nameLower.includes('tile') ||
+    nameLower.includes('box') ||
+    nameLower.includes('item') ||
+    nameLower.includes('container')
+  ) {
+    return {
+      width: style.width || '100%',
+      height: 100,
+      borderRadius,
+      marginVertical: style.marginVertical || 8,
+      ...style,
+    };
+  }
+
+  if (
+    nameLower.includes('button') ||
+    nameLower.includes('btn') ||
+    nameLower.includes('input') ||
+    nameLower.includes('field')
+  ) {
+    return {
+      width: style.width || '100%',
+      height: 44,
+      borderRadius,
+      marginVertical: style.marginVertical || 6,
+      ...style,
+    };
+  }
+
+  if (
+    nameLower.includes('avatar') ||
+    nameLower.includes('image') ||
+    nameLower.includes('photo') ||
+    nameLower.includes('pic') ||
+    nameLower.includes('icon')
+  ) {
+    const size = style.width || style.height || 50;
+    return {
+      width: size,
+      height: size,
+      borderRadius:
+        style.borderRadius !== undefined
+          ? style.borderRadius
+          : nameLower.includes('avatar')
+            ? 25
+            : 4,
+      ...style,
+    };
+  }
+
+  return {
+    width: style.width || '100%',
+    height: 60,
+    borderRadius,
+    marginVertical: style.marginVertical || 6,
+    ...style,
+  };
+};
+
 const isTextLike = (type: any, componentMap?: Record<string, any>): boolean => {
   if (!type) return false;
   if (
@@ -281,28 +369,28 @@ export const cloneLayoutTree = (
       return cloneLayoutTree(element.props.children, options, index, depth + 1);
     }
     const flatStyle = StyleSheet.flatten(element.props?.style);
-    if (flatStyle && (flatStyle.width || flatStyle.height || flatStyle.flex)) {
-      const layoutStyle = extractLayoutStyles(flatStyle);
-      const shimmerStyle = {
-        ...layoutStyle,
-        backgroundColor: activeColor,
-        borderRadius: layoutStyle.borderRadius || 4,
-      };
-      const key = element.key || `shimmer-${depth}-${index ?? 0}`;
-      return shimmerComponent ? (
-        React.createElement(shimmerComponent, {
-          key,
-          style: shimmerStyle,
-          opacity,
-        })
-      ) : (
-        <Animated.View
-          key={key}
-          style={[shimmerStyle, opacity ? { opacity } : undefined]}
-        />
-      );
-    }
-    return null;
+    const layoutStyle = getFallbackShimmerStyle(
+      element.type,
+      extractLayoutStyles(flatStyle)
+    );
+    const shimmerStyle = {
+      ...layoutStyle,
+      backgroundColor: activeColor,
+      borderRadius: layoutStyle.borderRadius || 4,
+    };
+    const key = element.key || `shimmer-${depth}-${index ?? 0}`;
+    return shimmerComponent ? (
+      React.createElement(shimmerComponent, {
+        key,
+        style: shimmerStyle,
+        opacity,
+      })
+    ) : (
+      <Animated.View
+        key={key}
+        style={[shimmerStyle, opacity ? { opacity } : undefined]}
+      />
+    );
   }
 
   const { type, props } = unwrapped;
@@ -383,9 +471,8 @@ export const cloneLayoutTree = (
 
   if (!hasChildren || !isViewLike(type, componentMap)) {
     const shimmerStyle: ViewStyle = {
-      ...layoutStyle,
+      ...getFallbackShimmerStyle(type, layoutStyle),
       backgroundColor: activeColor,
-      borderRadius: layoutStyle.borderRadius || 4,
     };
 
     if (shimmerComponent) {
