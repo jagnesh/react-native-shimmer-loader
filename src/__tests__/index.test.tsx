@@ -184,4 +184,22 @@ describe('ShimmerLoader', () => {
       padding: 10,
     });
   });
+
+  it('safely processes functional components without executing hooks during layout cloning', () => {
+    const ComponentWithHook: React.FC<{ style?: any }> = (props) => {
+      const [count] = React.useState(0);
+      return <View style={props.style}>{count}</View>;
+    };
+
+    const clonedTree: any = cloneLayoutTree(
+      <ComponentWithHook style={{ width: 120, height: 40 }} />
+    );
+
+    expect(clonedTree.props.style[0]).toEqual({
+      width: 120,
+      height: 40,
+      borderRadius: 4,
+      backgroundColor: '#E0E0E0',
+    });
+  });
 });

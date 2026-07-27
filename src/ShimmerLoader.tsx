@@ -81,16 +81,19 @@ const isTextLike = (type: any, componentMap?: Record<string, any>): boolean => {
     type === Animated.Text ||
     type === 'Text' ||
     type === 'RCTText'
-  )
+  ) {
     return true;
-  const name = type?.displayName || type?.name;
-  if (name === 'Text') return true;
+  }
+  const name =
+    typeof type === 'string' ? type : type?.displayName || type?.name;
+  if (name && (name === 'Text' || name.endsWith('Text'))) return true;
   if (
     componentMap &&
     name &&
     (componentMap[name] === Text || componentMap[name] === 'Text')
-  )
+  ) {
     return true;
+  }
   return false;
 };
 
@@ -105,16 +108,24 @@ const isImageLike = (
     type === Animated.Image ||
     type === 'Image' ||
     type === 'RCTImageView'
-  )
+  ) {
     return true;
-  const name = type?.displayName || type?.name;
-  if (name === 'Image' || name === 'ImageBackground') return true;
+  }
+  const name =
+    typeof type === 'string' ? type : type?.displayName || type?.name;
+  if (
+    name &&
+    (name === 'Image' || name === 'ImageBackground' || name.endsWith('Image'))
+  ) {
+    return true;
+  }
   if (
     componentMap &&
     name &&
     (componentMap[name] === Image || componentMap[name] === 'Image')
-  )
+  ) {
     return true;
+  }
   return false;
 };
 
@@ -124,28 +135,34 @@ const isViewLike = (type: any, componentMap?: Record<string, any>): boolean => {
     type === View ||
     type === Animated.View ||
     type === 'View' ||
-    type === 'RCTView' ||
-    type?.displayName === 'View'
-  )
+    type === 'RCTView'
+  ) {
     return true;
+  }
 
-  const name = type?.displayName || type?.name;
+  const name =
+    typeof type === 'string' ? type : type?.displayName || type?.name;
   if (
-    name === 'Pressable' ||
-    name === 'TouchableOpacity' ||
-    name === 'TouchableHighlight' ||
-    name === 'TouchableWithoutFeedback' ||
-    name === 'ScrollView' ||
-    name === 'SafeAreaView'
-  )
+    name &&
+    (name === 'View' ||
+      name.endsWith('View') ||
+      name === 'Pressable' ||
+      name === 'TouchableOpacity' ||
+      name === 'TouchableHighlight' ||
+      name === 'TouchableWithoutFeedback' ||
+      name === 'ScrollView' ||
+      name === 'SafeAreaView')
+  ) {
     return true;
+  }
 
   if (
     componentMap &&
     name &&
     (componentMap[name] === View || componentMap[name] === 'View')
-  )
+  ) {
     return true;
+  }
   return false;
 };
 
@@ -159,12 +176,11 @@ const unwrapElement = (
   }
 
   let type = element.type;
-  const props = element.props || {};
-
   if (!type) return element;
 
   // Check componentMap override
-  const componentName = type?.displayName || type?.name;
+  const componentName =
+    typeof type === 'string' ? type : type?.displayName || type?.name;
   if (componentMap && componentName && componentMap[componentName]) {
     const mapped = componentMap[componentName];
     if (
@@ -191,9 +207,8 @@ const unwrapElement = (
     (type.$$typeof === Symbol.for('react.memo') ||
       type.$$typeof === Symbol.for('react.memo_type'))
   ) {
-    const innerType = type.type;
     return unwrapElement(
-      { ...element, type: innerType },
+      { ...element, type: type.type },
       componentMap,
       depth + 1
     );
@@ -205,50 +220,17 @@ const unwrapElement = (
     (type.$$typeof === Symbol.for('react.forward_ref') ||
       typeof type.render === 'function')
   ) {
-    try {
-      const renderFn = type.render;
-      const rendered = renderFn(props, null);
-      if (rendered && typeof rendered === 'object' && rendered.type) {
-        return unwrapElement(rendered, componentMap, depth + 1);
-      }
-    } catch (e) {
-      // Ignore error and fall through
+    const renderFn = type.render;
+    if (renderFn && typeof renderFn === 'function') {
+      return unwrapElement(
+        { ...element, type: renderFn },
+        componentMap,
+        depth + 1
+      );
     }
   }
 
-  // Handle functional and class components
-  if (
-    typeof type === 'function' &&
-    type !== View &&
-    type !== Text &&
-    type !== Image &&
-    type?.displayName !== 'View' &&
-    type?.displayName !== 'Text' &&
-    type?.displayName !== 'Image'
-  ) {
-    if (type.prototype && type.prototype.isReactComponent) {
-      try {
-        const instance = new (type as any)(props);
-        const rendered = instance.render();
-        if (rendered && typeof rendered === 'object' && rendered.type) {
-          return unwrapElement(rendered, componentMap, depth + 1);
-        }
-      } catch (e) {
-        // Ignore
-      }
-    } else {
-      try {
-        const rendered = type(props);
-        if (rendered && typeof rendered === 'object' && rendered.type) {
-          return unwrapElement(rendered, componentMap, depth + 1);
-        }
-      } catch (e) {
-        // Ignore
-      }
-    }
-  }
-
-  return element;
+  return { ...element, type };
 };
 
 export interface CloneOptions {
@@ -306,9 +288,7 @@ export const cloneLayoutTree = (
         backgroundColor: activeColor,
         borderRadius: layoutStyle.borderRadius || 4,
       };
-      const key =
-        element.key ||
-        `shimmer-${index}-${Math.random().toString(36).substring(2, 9)}`;
+      const key = element.key || `shimmer-${depth}-${index ?? 0}`;
       return shimmerComponent ? (
         React.createElement(shimmerComponent, {
           key,
@@ -326,20 +306,17 @@ export const cloneLayoutTree = (
   }
 
   const { type, props } = unwrapped;
-  const key =
-    element.key ||
-    unwrapped.key ||
-    `shimmer-${index}-${Math.random().toString(36).substring(2, 9)}`;
+  const key = element.key || unwrapped.key || `shimmer-${depth}-${index ?? 0}`;
 
   if (type === React.Fragment || type === Symbol.for('react.fragment')) {
-    if (props.children) {
+    if (props?.children) {
       return cloneLayoutTree(props.children, options, index, depth + 1);
     }
     return null;
   }
 
   if (isTextLike(type, componentMap)) {
-    const textStyle = StyleSheet.flatten(props.style || {});
+    const textStyle = StyleSheet.flatten(props?.style || {});
     const layoutStyle = extractLayoutStyles(textStyle);
     const fontSize = textStyle.fontSize;
     const calculatedHeight =
@@ -366,7 +343,7 @@ export const cloneLayoutTree = (
   }
 
   if (isImageLike(type, componentMap)) {
-    const imageStyle = StyleSheet.flatten(props.style || {});
+    const imageStyle = StyleSheet.flatten(props?.style || {});
     const layoutStyle = extractLayoutStyles(imageStyle);
 
     const shimmerStyle: ViewStyle = {
@@ -388,7 +365,7 @@ export const cloneLayoutTree = (
   }
 
   let clonedChildren: any = null;
-  if (props.children) {
+  if (props?.children) {
     const childrenArray = React.Children.toArray(props.children);
     const cloned = childrenArray
       .map((child, idx) => cloneLayoutTree(child, options, idx, depth + 1))
@@ -400,7 +377,7 @@ export const cloneLayoutTree = (
     }
   }
 
-  const viewStyle = StyleSheet.flatten(props.style || {});
+  const viewStyle = StyleSheet.flatten(props?.style || {});
   const layoutStyle = extractLayoutStyles(viewStyle);
   const hasChildren = Boolean(clonedChildren && clonedChildren.length > 0);
 
@@ -536,7 +513,7 @@ export const ShimmerClone: React.FC<{
   const activeColor = color ?? shimmerColor ?? backgroundColor;
 
   return (
-    <View style={{ direction: isRtl ? 'rtl' : 'ltr' }}>
+    <View style={isRtl ? styles.rtl : styles.ltr}>
       {cloneLayoutTree(children, {
         opacity,
         shimmerComponent,
@@ -546,6 +523,15 @@ export const ShimmerClone: React.FC<{
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  rtl: {
+    direction: 'rtl',
+  },
+  ltr: {
+    direction: 'ltr',
+  },
+});
 
 const ShimmerLoader = LoadingWrapper;
 export default ShimmerLoader;
